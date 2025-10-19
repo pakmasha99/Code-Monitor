@@ -147,6 +147,66 @@ docker-compose down -v
 
 ---
 
+## 🔄 Phase 2: Git Sync & Weekly Submissions
+
+### Celery Worker 시작
+
+**새 터미널:**
+```bash
+cd backend
+celery -A app.core.celery_app worker --loglevel=info
+```
+
+### Celery Beat (스케줄러) 시작
+
+**새 터미널:**
+```bash
+cd backend
+celery -A app.core.celery_app beat --loglevel=info
+```
+
+> Celery Beat이 매일 자동으로 모든 사용자의 Git repository를 동기화합니다.
+
+### Weekly Submission 추가
+
+**API 사용:**
+```bash
+# 주간 제출 생성
+curl -X POST "http://localhost:8000/api/users/1/submissions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "week_start_date": "2024-01-15",
+    "code_lines_added": 450,
+    "documents_created": 3,
+    "notes": "Implemented authentication system"
+  }'
+
+# 사용자의 모든 제출 조회
+curl "http://localhost:8000/api/users/1/submissions"
+
+# 현재 주의 모든 제출 조회
+curl "http://localhost:8000/api/submissions/current-week"
+```
+
+### Git Repository 수동 동기화
+
+**Python 스크립트:**
+```python
+from backend.app.tasks.git_sync import sync_user_repository
+
+# 특정 사용자의 repository 동기화
+result = sync_user_repository(user_id=1)
+print(result)
+```
+
+**Celery 태스크로 실행:**
+```bash
+# 모든 repository 동기화
+celery -A app.core.celery_app call backend.app.tasks.git_sync.sync_all_repositories
+```
+
+---
+
 ## 🐛 문제 해결
 
 ### "Cannot connect to database"
@@ -185,7 +245,7 @@ kill -9 <PID>
 
 ## 📊 현재 MVP 기능
 
-✅ **완료:**
+✅ **Phase 1 완료:**
 - PostgreSQL + Redis Docker setup
 - Database models (5 tables)
 - Database initialization
@@ -193,12 +253,18 @@ kill -9 <PID>
 - Basic Streamlit dashboard
 - Health check endpoint
 
+✅ **Phase 2 완료:**
+- Git sync service (clone/pull, commit analysis)
+- Celery background tasks with Beat scheduler
+- Weekly submission API (CRUD operations)
+- Git metrics extraction (lines, languages, files)
+- Automated daily repository synchronization
+
 ⏳ **다음 Phase:**
-- Git sync service
-- Weekly submission API
-- Rankings calculation
-- Git metrics collection
+- Rankings calculation system
 - Advanced dashboard features
+- LLM code analysis integration
+- RAG system with vector database
 
 ---
 
