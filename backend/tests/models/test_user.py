@@ -7,7 +7,7 @@ import pytest
 from datetime import date
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.models.user import User, UserRole
+from app.models.user import User, UserRole
 
 
 class TestUserModel:

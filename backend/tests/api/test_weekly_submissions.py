@@ -4,9 +4,9 @@ Tests for weekly submission API endpoints
 from datetime import date, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.models.user import User, UserRole
-from backend.app.models.weekly_submission import WeeklySubmission
+from app.main import app
+from app.models.user import User, UserRole
+from app.models.weekly_submission import WeeklySubmission
 
 
 class TestWeeklySubmissionAPI:

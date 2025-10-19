@@ -260,9 +260,17 @@ kill -9 <PID>
 - Git metrics extraction (lines, languages, files)
 - Automated daily repository synchronization
 
+✅ **Phase 3 완료:**
+- Rankings calculation service (TDD)
+- Score calculation (productivity, quality, consistency)
+- Rankings API endpoints (current/week/top/history)
+- Automatic weekly ranking updates via Celery
+- User ranking history tracking
+- Backfill support for historical rankings
+
 ⏳ **다음 Phase:**
-- Rankings calculation system
-- Advanced dashboard features
+- Advanced dashboard with rankings display
+- Charts and trend visualization
 - LLM code analysis integration
 - RAG system with vector database
 

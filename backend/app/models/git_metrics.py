@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.models.base import Base
+from app.models.base import Base
 
 
 class GitMetrics(Base):

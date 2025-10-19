@@ -2,7 +2,7 @@
 Celery application configuration
 """
 from celery import Celery
-from backend.app.core.config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 
@@ -11,7 +11,7 @@ celery_app = Celery(
     "code_monitor",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=['backend.app.tasks.git_sync']
+    include=['app.tasks.git_sync', 'app.tasks.ranking_update']
 )
 
 # Celery configuration
@@ -31,8 +31,11 @@ celery_app.conf.update(
 # Periodic tasks (Beat schedule)
 celery_app.conf.beat_schedule = {
     'sync-all-repos-daily': {
-        'task': 'backend.app.tasks.git_sync.sync_all_repositories',
-        'schedule': 86400.0,  # Every 24 hours (daily at 2 AM configured via crontab)
-        # 'schedule': crontab(hour=2, minute=0),  # Alternative: specific time
+        'task': 'app.tasks.git_sync.sync_all_repositories',
+        'schedule': 86400.0,  # Every 24 hours
+    },
+    'update-rankings-weekly': {
+        'task': 'app.tasks.ranking_update.update_current_week_rankings',
+        'schedule': 604800.0,  # Every 7 days (weekly)
     },
 }

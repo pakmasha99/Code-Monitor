@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import String, Integer, Date, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.models.base import Base
+from app.models.base import Base
 
 
 class WeeklySubmission(Base):

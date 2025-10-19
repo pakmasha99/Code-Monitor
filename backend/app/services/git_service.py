@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import git
 from git import Repo, NULL_TREE
 
-from backend.app.core.config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 

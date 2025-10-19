@@ -5,10 +5,11 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import get_settings
-from backend.app.core.database import get_db
-from backend.app.api.users import router as users_router
-from backend.app.api.weekly_submissions import router as submissions_router
+from app.core.config import get_settings
+from app.core.database import get_db
+from app.api.users import router as users_router
+from app.api.weekly_submissions import router as submissions_router
+from app.api.rankings import router as rankings_router
 
 settings = get_settings()
 
@@ -29,6 +30,7 @@ app.add_middleware(
 # Include routers
 app.include_router(users_router)
 app.include_router(submissions_router)
+app.include_router(rankings_router)
 
 
 @app.get("/")

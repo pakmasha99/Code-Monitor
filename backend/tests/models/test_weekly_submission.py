@@ -7,7 +7,7 @@ import pytest
 from datetime import date, datetime
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.models.weekly_submission import WeeklySubmission
+from app.models.weekly_submission import WeeklySubmission
 
 
 class TestWeeklySubmissionModel:

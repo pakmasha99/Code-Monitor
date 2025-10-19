@@ -7,7 +7,7 @@ from sqlalchemy import String, Date, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
-from backend.app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin
 
 
 class UserRole(str, enum.Enum):

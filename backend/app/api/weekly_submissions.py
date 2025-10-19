@@ -6,10 +6,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend.app.core.database import get_db
-from backend.app.models.user import User
-from backend.app.models.weekly_submission import WeeklySubmission
-from backend.app.schemas.weekly_submission import (
+from app.core.database import get_db
+from app.models.user import User
+from app.models.weekly_submission import WeeklySubmission
+from app.schemas.weekly_submission import (
     WeeklySubmissionCreate,
     WeeklySubmissionUpdate,
     WeeklySubmissionResponse,

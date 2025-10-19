@@ -5,11 +5,11 @@ from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy.orm import Session
 
-from backend.app.core.celery_app import celery_app
-from backend.app.core.database import SessionLocal
-from backend.app.models.user import User
-from backend.app.models.git_metrics import GitMetrics
-from backend.app.services.git_service import GitSyncService
+from app.core.celery_app import celery_app
+from app.core.database import SessionLocal
+from app.models.user import User
+from app.models.git_metrics import GitMetrics
+from app.services.git_service import GitSyncService
 
 
 def get_week_start_date(date: datetime) -> datetime:

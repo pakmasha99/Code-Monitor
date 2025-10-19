@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
 
-from backend.app.core.database import get_db
-from backend.app.models.user import User, UserRole
+from app.core.database import get_db
+from app.models.user import User, UserRole
+from app.schemas.ranking import RankingHistory
+from app.services.ranking_service import RankingService
 
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["Users"])
 
 
 # Pydantic schemas
@@ -63,3 +65,28 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.get("/users/{user_id}/ranking/history", response_model=List[RankingHistory])
+def get_user_ranking_history(
+    user_id: int,
+    weeks: int = 4,
+    db: Session = Depends(get_db)
+):
+    """
+    Get ranking history for a user over N weeks.
+
+    - **user_id**: User ID
+    - **weeks**: Number of weeks to look back (1-52, default 4)
+
+    Returns rankings ordered by week (most recent first).
+    """
+    # Check if user exists
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    service = RankingService()
+    history = service.get_user_ranking_history(user_id, weeks, db)
+
+    return history

@@ -1,16 +1,22 @@
 """
 Pytest fixtures for testing
 """
+import sys
+from pathlib import Path
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
-from backend.app.models.base import Base
-from backend.app.models.user import User, UserRole
-from backend.app.core.database import get_db
+# Add backend directory to path
+backend_path = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_path))
+
+from app.main import app
+from app.models.base import Base
+from app.models.user import User, UserRole
+from app.core.database import get_db
 
 
 @pytest.fixture(scope="function")
@@ -56,7 +62,7 @@ def client(db_session):
 def sample_user(db_session) -> User:
     """Create a sample user for testing"""
     user = User(
-        name="@ ",
+        name="Test User",
         email="test@lab.com",
         github_username="test_user",
         role=UserRole.STUDENT
