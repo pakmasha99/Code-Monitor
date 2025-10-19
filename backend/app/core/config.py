@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
 
     # Database
-    DATABASE_URL: str = "postgresql://lab:lab123@localhost:5432/code_monitor"
+    DATABASE_URL: str = "postgresql://lab:lab123@localhost:5433/code_monitor"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
