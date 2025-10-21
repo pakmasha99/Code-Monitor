@@ -1,0 +1,245 @@
+'use client';
+
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getGitStats } from "@/lib/api";
+
+interface SubmitClientProps {
+  userEmail: string;
+  currentWeekMonday: string;
+}
+
+export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitClientProps) {
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [autoFetchedLines, setAutoFetchedLines] = useState<number | null>(null);
+  const [codeLinesAdded, setCodeLinesAdded] = useState<string>('0');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Auto-fetch git stats on component mount
+  useEffect(() => {
+    async function fetchGitStats() {
+      try {
+        setLoading(true);
+        setFetchError(null);
+
+        // Fetch user by email
+        const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`);
+        const users = await usersResponse.json();
+        const user = users.find((u: any) => u.email === userEmail);
+
+        if (!user) {
+          setFetchError('User not found in database');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch git stats
+        const since = new Date(currentWeekMonday).toISOString();
+        const stats = await getGitStats(user.id, since);
+
+        // Set auto-fetched value
+        setAutoFetchedLines(stats.lines_added);
+        setCodeLinesAdded(stats.lines_added.toString());
+
+      } catch (error: any) {
+        console.error('Failed to fetch git stats:', error);
+        setFetchError(error.message || 'Unable to fetch git stats automatically');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchGitStats();
+  }, [userEmail, currentWeekMonday]);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
+    const codeLinesAdded = formData.get('code_lines_added');
+    const documentsCreated = formData.get('documents_created');
+    const notes = formData.get('notes');
+    const weekStartDate = formData.get('week_start_date');
+
+    try {
+      // Get user ID from email
+      const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`);
+      const users = await usersResponse.json();
+      const user = users.find((u: any) => u.email === userEmail);
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Submit the weekly submission
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            week_start_date: weekStartDate,
+            code_lines_added: parseInt(codeLinesAdded as string) || 0,
+            documents_created: parseInt(documentsCreated as string) || 0,
+            notes: notes || null,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        // Redirect to dashboard on success
+        window.location.href = '/dashboard';
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Submission failed');
+      }
+    } catch (error: any) {
+      alert(error.message || 'Submission failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="rounded-lg border bg-card p-8">
+        <h2 className="text-3xl font-bold mb-2">
+          Weekly Submission
+        </h2>
+        <p className="text-muted-foreground mb-8">
+          Submit your weekly coding activities for week of <strong>{currentWeekMonday}</strong>
+        </p>
+
+        {/* Auto-fetch status */}
+        {loading && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              🔄 Fetching your git statistics...
+            </p>
+          </div>
+        )}
+
+        {!loading && autoFetchedLines !== null && (
+          <div className="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+            <p className="text-sm text-green-700 dark:text-green-400">
+              ✅ Auto-fetched from your GitHub: <strong>{autoFetchedLines}</strong> lines added this week
+            </p>
+          </div>
+        )}
+
+        {!loading && fetchError && (
+          <div className="mb-6 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900">
+            <p className="text-sm text-yellow-700 dark:text-yellow-400">
+              ⚠️ {fetchError}
+            </p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
+              Please enter your code lines manually or add your GitHub repository URL in your profile.
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Hidden week start date */}
+          <input type="hidden" name="week_start_date" value={currentWeekMonday} />
+
+          {/* Code Lines Added */}
+          <div className="space-y-2">
+            <label htmlFor="code_lines_added" className="text-sm font-medium">
+              📝 Code Lines Added
+            </label>
+            <input
+              type="number"
+              id="code_lines_added"
+              name="code_lines_added"
+              min="0"
+              value={codeLinesAdded}
+              onChange={(e) => setCodeLinesAdded(e.target.value)}
+              required
+              disabled={loading}
+              className="w-full px-4 py-2 rounded-md border bg-background disabled:opacity-50"
+              placeholder="e.g., 450"
+            />
+            <p className="text-xs text-muted-foreground">
+              {autoFetchedLines !== null
+                ? 'Auto-fetched from GitHub (you can modify if needed)'
+                : 'Total lines of code added this week'}
+            </p>
+          </div>
+
+          {/* Documents Created */}
+          <div className="space-y-2">
+            <label htmlFor="documents_created" className="text-sm font-medium">
+              📄 Documents Created
+            </label>
+            <input
+              type="number"
+              id="documents_created"
+              name="documents_created"
+              min="0"
+              defaultValue="0"
+              required
+              disabled={loading}
+              className="w-full px-4 py-2 rounded-md border bg-background disabled:opacity-50"
+              placeholder="e.g., 3"
+            />
+            <p className="text-xs text-muted-foreground">
+              Number of documentation files/pages created
+            </p>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <label htmlFor="notes" className="text-sm font-medium">
+              📋 Weekly Notes (Optional)
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              rows={4}
+              maxLength={5000}
+              disabled={loading}
+              className="w-full px-4 py-2 rounded-md border bg-background disabled:opacity-50"
+              placeholder="Describe what you worked on this week..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Brief summary of your work this week (max 5000 characters)
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex gap-4 pt-4">
+            <Button
+              type="submit"
+              size="lg"
+              className="flex-1"
+              disabled={loading || submitting}
+            >
+              {submitting ? '⏳ Submitting...' : '✅ Submit Weekly Report'}
+            </Button>
+            <Link href="/dashboard" className="flex-1">
+              <Button type="button" variant="outline" size="lg" className="w-full" disabled={submitting}>
+                Cancel
+              </Button>
+            </Link>
+          </div>
+        </form>
+
+        {/* Info Box */}
+        <div className="mt-8 p-4 rounded-lg bg-muted">
+          <h3 className="font-semibold mb-2">ℹ️ Submission Guidelines</h3>
+          <ul className="text-sm space-y-1 text-muted-foreground">
+            <li>• You can submit once per week (Monday to Sunday)</li>
+            <li>• Git statistics are automatically fetched from your GitHub</li>
+            <li>• You can modify auto-fetched values if needed</li>
+            <li>• Include meaningful notes to track your progress</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  );
+}

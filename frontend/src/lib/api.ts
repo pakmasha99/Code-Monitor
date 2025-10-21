@@ -53,6 +53,16 @@ export interface LeaderboardEntry extends Ranking {
   user: User;
 }
 
+export interface GitStatsResponse {
+  commits_count: number;
+  files_changed: number;
+  lines_added: number;
+  lines_deleted: number;
+  languages_breakdown: Record<string, number>;
+  analyzed_since: string;
+  repo_url: string;
+}
+
 /**
  * Fetch all users
  */
@@ -198,6 +208,27 @@ export async function healthCheck(): Promise<{ status: string; database: string 
   const response = await fetch(`${API_URL}/health`);
   if (!response.ok) {
     throw new Error('API is not healthy');
+  }
+  return response.json();
+}
+
+/**
+ * Get git statistics for a user's repository
+ */
+export async function getGitStats(
+  userId: number,
+  since: string,
+  repoUrl?: string
+): Promise<GitStatsResponse> {
+  const params = new URLSearchParams({ since });
+  if (repoUrl) {
+    params.append('repo_url', repoUrl);
+  }
+
+  const response = await fetch(`${API_URL}/api/users/${userId}/git-stats?${params.toString()}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to fetch git stats');
   }
   return response.json();
 }

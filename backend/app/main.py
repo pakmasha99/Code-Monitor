@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.api.users import router as users_router
 from app.api.weekly_submissions import router as submissions_router
 from app.api.rankings import router as rankings_router
+from app.api.git_stats import router as git_stats_router
 
 settings = get_settings()
 
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(users_router)
 app.include_router(submissions_router)
 app.include_router(rankings_router)
+app.include_router(git_stats_router)
 
 
 @app.get("/")
