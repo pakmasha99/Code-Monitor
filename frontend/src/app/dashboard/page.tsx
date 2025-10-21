@@ -11,14 +11,6 @@ import { ScoreBreakdownChart } from "@/components/charts/ScoreBreakdownChart";
 // Force dynamic rendering to prevent caching of session state
 export const dynamic = 'force-dynamic';
 
-// Mock data for charts (will be replaced with real API data)
-const mockActivityData = [
-  { week: 'Week 1', commits: 12, lines: 450, score: 65 },
-  { week: 'Week 2', commits: 15, lines: 850, score: 80 },
-  { week: 'Week 3', commits: 10, lines: 600, score: 70 },
-  { week: 'Week 4', commits: 18, lines: 920, score: 95 },
-];
-
 export default async function DashboardPage() {
   const session = await auth();
 
@@ -26,8 +18,10 @@ export default async function DashboardPage() {
     redirect('/');
   }
 
-  // Fetch user's own stats
-  let userStats = { rank: 0, score: 0, linesAdded: 0, commits: 0 };
+  // Fetch user's own stats and activity data
+  let userStats = { rank: 0, score: 0, linesAdded: 0, commits: 0, productivity: 0 };
+  let activityData: Array<{ week: string; commits: number; lines: number; score: number }> = [];
+
   try {
     // Get all users to find current user's ID
     const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`);
@@ -42,18 +36,59 @@ export default async function DashboardPage() {
       if (userRanking) {
         userStats.rank = userRanking.rank_position;
         userStats.score = userRanking.total_score;
+        userStats.productivity = userRanking.category_scores?.productivity || userRanking.total_score;
       }
 
-      // Get user's submissions to get lines added
+      // Get user's submissions to get lines added and build activity data
       const submissionsResponse = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/users/${currentUser.id}/submissions`
       );
       const submissions = await submissionsResponse.json();
 
-      // Get current week's submission
+      // Build activity data from real submissions
       if (submissions.length > 0) {
-        const latestSubmission = submissions[submissions.length - 1];
+        const latestSubmission = submissions[0]; // Most recent first from API
         userStats.linesAdded = latestSubmission.code_lines_added;
+
+        // Convert submissions to activity chart format (last 4 weeks)
+        activityData = submissions.slice(0, 4).reverse().map((sub: any, index: number) => {
+          const weekDate = new Date(sub.week_start_date);
+          const weekLabel = `Week ${index + 1} (${weekDate.getMonth() + 1}/${weekDate.getDate()})`;
+
+          return {
+            week: weekLabel,
+            commits: 0, // We don't track commits in submissions yet
+            lines: sub.code_lines_added,
+            score: 0, // Will be filled from rankings if available
+          };
+        });
+
+        // Try to get ranking history to fill in scores
+        try {
+          const rankingHistoryResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/users/${currentUser.id}/ranking/history`
+          );
+          const rankingHistory = await rankingHistoryResponse.json();
+
+          // Match rankings to activity data by week_start_date
+          activityData = activityData.map(activity => {
+            const matchingRanking = rankingHistory.find((r: any) => {
+              const activityWeek = activity.week.match(/\((\d+)\/(\d+)\)/);
+              if (!activityWeek) return false;
+
+              const rankingDate = new Date(r.week_start_date);
+              return rankingDate.getMonth() + 1 === parseInt(activityWeek[1]) &&
+                     rankingDate.getDate() === parseInt(activityWeek[2]);
+            });
+
+            return {
+              ...activity,
+              score: matchingRanking ? matchingRanking.total_score : 0,
+            };
+          });
+        } catch (error) {
+          console.error('Failed to fetch ranking history:', error);
+        }
       }
     }
   } catch (error) {
@@ -151,8 +186,8 @@ export default async function DashboardPage() {
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">⚡</div>
               <h3 className="font-semibold text-lg mb-1">Total Score</h3>
-              <p className="text-3xl font-bold text-primary">{userStats.score}</p>
-              <p className="text-sm text-muted-foreground mt-1">Points</p>
+              <p className="text-3xl font-bold text-primary">{userStats.score.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-1">Lines</p>
             </div>
 
             <div className="rounded-lg border bg-card p-6">
@@ -182,7 +217,7 @@ export default async function DashboardPage() {
             <div className="rounded-lg border bg-card p-6">
               <h2 className="text-2xl font-bold mb-4">🎯 Your Score Breakdown</h2>
               <ScoreBreakdownChart
-                productivity={80}
+                productivity={userStats.productivity > 0 ? 100 : 0}
                 quality={0}
                 consistency={0}
               />
@@ -190,10 +225,12 @@ export default async function DashboardPage() {
           </div>
 
           {/* Activity Trend Chart */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-2xl font-bold mb-4">📈 Your Activity Trend (Last 4 Weeks)</h2>
-            <ActivityChart data={mockActivityData} />
-          </div>
+          {activityData.length > 0 && (
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="text-2xl font-bold mb-4">📈 Your Activity Trend (Last {activityData.length} Week{activityData.length > 1 ? 's' : ''})</h2>
+              <ActivityChart data={activityData} />
+            </div>
+          )}
 
           {/* Leaderboard Table */}
           <div className="rounded-lg border bg-card p-6">
@@ -223,8 +260,8 @@ export default async function DashboardPage() {
                       <p className="text-sm text-muted-foreground">Rank #{entry.rank}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-2xl font-bold ${textColors[index]}`}>{entry.score}</p>
-                      <p className="text-sm text-muted-foreground">points</p>
+                      <p className={`text-2xl font-bold ${textColors[index]}`}>{entry.score.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">lines</p>
                     </div>
                   </div>
                 );

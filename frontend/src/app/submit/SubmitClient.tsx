@@ -16,6 +16,8 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
   const [autoFetchedLines, setAutoFetchedLines] = useState<number | null>(null);
   const [codeLinesAdded, setCodeLinesAdded] = useState<string>('0');
   const [submitting, setSubmitting] = useState(false);
+  const [customRepoUrls, setCustomRepoUrls] = useState<string[]>(['']);
+  const [repoUrlErrors, setRepoUrlErrors] = useState<{ [key: number]: string | null }>({});
 
   // Auto-fetch git stats on component mount
   useEffect(() => {
@@ -54,6 +56,50 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
     fetchGitStats();
   }, [userEmail, currentWeekMonday]);
 
+  // Validate GitHub URL format
+  function validateGitHubUrl(url: string): boolean {
+    if (!url) return true; // Empty is allowed (optional field)
+
+    // Allow both HTTPS and SSH formats
+    const httpsPattern = /^https:\/\/github\.com\/.+\/.+/;
+    const sshPattern = /^git@github\.com:.+\/.+\.git$/;
+
+    return httpsPattern.test(url) || sshPattern.test(url);
+  }
+
+  // Handle custom repo URL changes with validation
+  function handleCustomRepoUrlChange(index: number, value: string) {
+    const newUrls = [...customRepoUrls];
+    newUrls[index] = value;
+    setCustomRepoUrls(newUrls);
+
+    // Validate the URL
+    if (value && !validateGitHubUrl(value)) {
+      setRepoUrlErrors({...repoUrlErrors, [index]: 'Only GitHub URLs are allowed (e.g., https://github.com/user/repo or git@github.com:user/repo.git)'});
+    } else {
+      const newErrors = {...repoUrlErrors};
+      delete newErrors[index];
+      setRepoUrlErrors(newErrors);
+    }
+  }
+
+  // Add new repository URL field
+  function addRepoUrlField() {
+    if (customRepoUrls.length < 5) {
+      setCustomRepoUrls([...customRepoUrls, '']);
+    }
+  }
+
+  // Remove repository URL field
+  function removeRepoUrlField(index: number) {
+    if (customRepoUrls.length > 1) {
+      setCustomRepoUrls(customRepoUrls.filter((_, i) => i !== index));
+      const newErrors = {...repoUrlErrors};
+      delete newErrors[index];
+      setRepoUrlErrors(newErrors);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
@@ -63,6 +109,16 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
     const documentsCreated = formData.get('documents_created');
     const notes = formData.get('notes');
     const weekStartDate = formData.get('week_start_date');
+
+    // Validate all custom repo URLs if provided
+    const nonEmptyUrls = customRepoUrls.filter(url => url.trim() !== '');
+    for (let i = 0; i < nonEmptyUrls.length; i++) {
+      if (!validateGitHubUrl(nonEmptyUrls[i])) {
+        alert(`Please enter valid GitHub URLs (Repository ${i + 1} is invalid)`);
+        setSubmitting(false);
+        return;
+      }
+    }
 
     try {
       // Get user ID from email
@@ -75,6 +131,18 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
       }
 
       // Submit the weekly submission
+      const submissionData: any = {
+        week_start_date: weekStartDate,
+        code_lines_added: parseInt(codeLinesAdded as string) || 0,
+        documents_created: parseInt(documentsCreated as string) || 0,
+        notes: notes || null,
+      };
+
+      // Include custom repo URLs if provided (filter out empty strings)
+      if (nonEmptyUrls.length > 0) {
+        submissionData.custom_repo_urls = nonEmptyUrls;
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions`,
         {
@@ -82,12 +150,7 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            week_start_date: weekStartDate,
-            code_lines_added: parseInt(codeLinesAdded as string) || 0,
-            documents_created: parseInt(documentsCreated as string) || 0,
-            notes: notes || null,
-          }),
+          body: JSON.stringify(submissionData),
         }
       );
 
@@ -171,6 +234,81 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
             </p>
           </div>
 
+          {/* Custom Repository URLs (Optional) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">
+                🔗 Custom Repository URLs <span className="text-muted-foreground font-normal">(Optional, max 5)</span>
+              </label>
+              {customRepoUrls.length < 5 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addRepoUrlField}
+                  disabled={loading || submitting}
+                  className="h-8 px-3"
+                >
+                  ➕ Add Repository
+                </Button>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Leave empty to use your default repository. Add custom repositories for team projects, lab work, or organization projects.
+            </p>
+
+            {customRepoUrls.map((url, index) => (
+              <div key={index} className="space-y-2">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={url}
+                      onChange={(e) => handleCustomRepoUrlChange(index, e.target.value)}
+                      disabled={loading || submitting}
+                      className={`w-full px-4 py-2 rounded-md border bg-background disabled:opacity-50 ${
+                        repoUrlErrors[index] ? 'border-red-500' : ''
+                      }`}
+                      placeholder={`Repository ${index + 1}: e.g., https://github.com/Transconnectome/connectome-kb`}
+                    />
+                    {repoUrlErrors[index] && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {repoUrlErrors[index]}
+                      </p>
+                    )}
+                  </div>
+                  {customRepoUrls.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeRepoUrlField(index)}
+                      disabled={loading || submitting}
+                      className="h-10 px-3 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      ✖
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {customRepoUrls.filter(url => url.trim() !== '').length > 0 &&
+             Object.keys(repoUrlErrors).length === 0 && (
+              <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
+                <p className="text-xs text-blue-700 dark:text-blue-400 font-semibold mb-1">
+                  📍 This week's submission will use:
+                </p>
+                <ul className="text-xs text-blue-600 dark:text-blue-300 space-y-1">
+                  {customRepoUrls.filter(url => url.trim() !== '').map((url, idx) => (
+                    <li key={idx} className="font-mono">• {url}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
           {/* Documents Created */}
           <div className="space-y-2">
             <label htmlFor="documents_created" className="text-sm font-medium">
@@ -234,7 +372,8 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
           <h3 className="font-semibold mb-2">ℹ️ Submission Guidelines</h3>
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• You can submit once per week (Monday to Sunday)</li>
-            <li>• Git statistics are automatically fetched from your GitHub</li>
+            <li>• Git statistics are automatically fetched from your default GitHub repository</li>
+            <li>• You can specify up to 5 custom repository URLs for team projects, lab work, or organization projects</li>
             <li>• You can modify auto-fetched values if needed</li>
             <li>• Include meaningful notes to track your progress</li>
           </ul>

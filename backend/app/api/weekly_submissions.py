@@ -15,6 +15,8 @@ from app.schemas.weekly_submission import (
     WeeklySubmissionResponse,
     WeeklySubmissionWithUser
 )
+from app.services.ranking_service import RankingService
+from app.api.git_stats import validate_github_url
 
 router = APIRouter(prefix="/api", tags=["Weekly Submissions"])
 
@@ -38,6 +40,7 @@ def create_weekly_submission(
     - **code_lines_added**: Lines of code added
     - **documents_created**: Number of documents created
     - **notes**: Optional notes about the week
+    - **custom_repo_url**: Optional custom repository URL to use instead of user's default repo
     """
     # Check if user exists
     user = db.query(User).filter(User.id == user_id).first()
@@ -56,14 +59,48 @@ def create_weekly_submission(
             detail=f"Submission already exists for week starting {submission_data.week_start_date}"
         )
 
-    # Create submission
+    # Determine which repository URLs to use (supports multiple repos)
+    effective_repo_urls = []
+
+    # Priority: custom_repo_urls > custom_repo_url > user.repo_url
+    if submission_data.custom_repo_urls:
+        effective_repo_urls = submission_data.custom_repo_urls
+    elif submission_data.custom_repo_url:
+        # Backward compatibility: single custom_repo_url
+        effective_repo_urls = [submission_data.custom_repo_url]
+    elif user.repo_url:
+        effective_repo_urls = [user.repo_url]
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="No repository URL available. Please provide custom_repo_urls or update user profile."
+        )
+
+    # Security: Validate all GitHub URLs
+    for repo_url in effective_repo_urls:
+        if not validate_github_url(repo_url):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Only GitHub URLs are allowed. Invalid URL: {repo_url}"
+            )
+
+    # Store repository URLs as comma-separated string
+    repository_url_str = ",".join(effective_repo_urls)
+
+    # Create submission with repository_url
+    submission_dict = submission_data.model_dump(exclude={'custom_repo_url', 'custom_repo_urls'})
     submission = WeeklySubmission(
         user_id=user_id,
-        **submission_data.model_dump()
+        repository_url=repository_url_str,
+        **submission_dict
     )
     db.add(submission)
     db.commit()
     db.refresh(submission)
+
+    # Automatically update rankings for this week
+    ranking_service = RankingService()
+    ranking_service.update_weekly_rankings(submission.week_start_date, db)
 
     return submission
 
@@ -179,6 +216,10 @@ def update_submission(
 
     db.commit()
     db.refresh(submission)
+
+    # Automatically update rankings for this week
+    ranking_service = RankingService()
+    ranking_service.update_weekly_rankings(submission.week_start_date, db)
 
     return submission
 

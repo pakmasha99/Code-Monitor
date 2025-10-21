@@ -22,6 +22,7 @@ class WeeklySubmission(Base):
         documents_created: Number of documents created this week
         documents_modified: Number of documents modified this week
         notes: Free-text weekly notes/summary
+        repository_url: The actual repository URL used for this submission
         submission_timestamp: When the submission was made
     """
     __tablename__ = "weekly_submissions"
@@ -37,6 +38,7 @@ class WeeklySubmission(Base):
     documents_created: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     documents_modified: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    repository_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     submission_timestamp: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

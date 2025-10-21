@@ -15,15 +15,8 @@ from app.models.ranking import Ranking
 class RankingService:
     """Service for calculating and managing user rankings"""
 
-    # Score weights for different components
-    WEIGHTS = {
-        'commits': 2.0,
-        'lines_added': 0.1,
-        'files_changed': 1.5,
-        'documents_created': 10.0,
-        'quality_ratio': 20.0,
-        'consistency_bonus': 15.0
-    }
+    # Simplified scoring: based on lines only
+    LINES_PER_DOCUMENT = 100
 
     def calculate_weekly_score(
         self,
@@ -32,7 +25,9 @@ class RankingService:
         db: Session
     ) -> Dict[str, float]:
         """
-        Calculate comprehensive weekly score for a user.
+        Calculate weekly score based on lines of work.
+
+        Score = code_lines_added + (documents_created × 100)
 
         Args:
             user_id: User ID
@@ -40,68 +35,27 @@ class RankingService:
             db: Database session
 
         Returns:
-            Dict with total_score and category scores (productivity, quality, consistency)
+            Dict with total_score (in lines) and category scores
         """
-        # Get git metrics
-        git_metrics = db.query(GitMetrics).filter(
-            GitMetrics.user_id == user_id,
-            GitMetrics.week_start_date == week_start_date
-        ).first()
-
         # Get weekly submission
         submission = db.query(WeeklySubmission).filter(
             WeeklySubmission.user_id == user_id,
             WeeklySubmission.week_start_date == week_start_date
         ).first()
 
-        # Initialize scores
-        productivity_score = 0.0
-        quality_score = 0.0
-        consistency_score = 0.0
-
-        # Calculate productivity from git metrics
-        if git_metrics:
-            productivity_score += (
-                git_metrics.commits_count * self.WEIGHTS['commits'] +
-                git_metrics.lines_added * self.WEIGHTS['lines_added'] +
-                git_metrics.files_changed * self.WEIGHTS['files_changed']
-            )
-
-            # Calculate quality based on code ratio
-            if git_metrics.lines_added > 0:
-                # Lower deletion ratio = higher quality
-                deletion_ratio = git_metrics.lines_deleted / max(git_metrics.lines_added, 1)
-                quality_factor = max(0, 1 - deletion_ratio)  # 0 to 1
-                quality_score += quality_factor * self.WEIGHTS['quality_ratio']
-
-            # Calculate consistency from commits
-            # Ideal: 2-3 commits per day (10-15 per week)
-            if git_metrics.commits_count > 0:
-                # Reward consistent commits, penalty for too few or too many
-                if 5 <= git_metrics.commits_count <= 20:
-                    consistency_score += self.WEIGHTS['consistency_bonus']
-                elif git_metrics.commits_count > 20:
-                    # Slight penalty for excessive commits (might indicate poor planning)
-                    consistency_score += self.WEIGHTS['consistency_bonus'] * 0.7
-                else:
-                    # Fewer than 5 commits
-                    consistency_score += self.WEIGHTS['consistency_bonus'] * 0.4
-
-        # Add manual submission data
+        # Calculate total lines
+        total_lines = 0.0
         if submission:
-            productivity_score += (
-                submission.code_lines_added * self.WEIGHTS['lines_added'] +
-                submission.documents_created * self.WEIGHTS['documents_created']
+            total_lines = float(
+                submission.code_lines_added +
+                (submission.documents_created * self.LINES_PER_DOCUMENT)
             )
-
-        # Calculate total score
-        total_score = productivity_score + quality_score + consistency_score
 
         return {
-            'total_score': round(total_score, 2),
-            'productivity': round(productivity_score, 2),
-            'quality': round(quality_score, 2),
-            'consistency': round(consistency_score, 2)
+            'total_score': total_lines,
+            'productivity': total_lines,  # All score is productivity
+            'quality': 0.0,
+            'consistency': 0.0
         }
 
     def update_weekly_rankings(
