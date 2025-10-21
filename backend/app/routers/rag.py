@@ -49,7 +49,7 @@ class AskRequest(BaseModel):
 
 class ReindexRequest(BaseModel):
     """Reindex request"""
-    repository_id: int = Field(..., description="Repository ID to reindex")
+    user_id: int = Field(..., description="User ID whose repository to reindex")
 
 
 class SearchResult(BaseModel):
@@ -286,7 +286,7 @@ async def trigger_reindex(request: ReindexRequest, background_tasks: BackgroundT
     Trigger codebase reindexing
 
     **Process**:
-    1. Fetch repository files
+    1. Fetch user's repository using GitSyncService
     2. Parse code with tree-sitter
     3. Generate embeddings
     4. Build BM25 + vector indices
@@ -298,12 +298,12 @@ async def trigger_reindex(request: ReindexRequest, background_tasks: BackgroundT
         from app.tasks.rag_indexing import reindex_repository
 
         # Trigger async Celery task
-        task = reindex_repository.delay(request.repository_id)
+        task = reindex_repository.delay(request.user_id)
 
         return ReindexResponse(
             status="queued",
             task_id=task.id,
-            message=f"Repository {request.repository_id} reindexing queued. Task ID: {task.id}"
+            message=f"User {request.user_id} repository reindexing queued. Task ID: {task.id}"
         )
 
     except Exception as e:

@@ -74,11 +74,12 @@ class GitSyncService:
         if since_date.tzinfo is None:
             since_date = since_date.replace(tzinfo=timezone.utc)
 
-        for commit in repo.iter_commits():
+        # Use '--all' to iterate over all branches, not just HEAD
+        for commit in repo.iter_commits('--all'):
             # Convert commit timestamp to timezone-aware datetime (UTC)
             commit_date = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
             if commit_date < since_date:
-                break
+                continue  # Don't break - other branches may have newer commits
             commits.append(commit)
 
         return commits

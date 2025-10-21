@@ -14,6 +14,7 @@ from app.core.database import SessionLocal
 from app.services.code_analyzer import CodeAnalyzer
 from app.services.embedding_service import EmbeddingService
 from app.services.hybrid_search_service import HybridSearchService
+from app.services.git_service import GitSyncService
 from app.models.user import User
 
 
@@ -44,19 +45,20 @@ class RAGIndexingTask(Task):
 
 
 @celery_app.task(base=RAGIndexingTask, bind=True, name="app.tasks.rag_indexing.reindex_repository")
-def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
+def reindex_repository(self, user_id: int) -> Dict[str, Any]:
     """
-    Reindex a single repository
+    Reindex a user's repository using GitSyncService
 
     Steps:
-    1. Fetch repository path from database
-    2. Find all code files (Python, JavaScript)
-    3. Parse with tree-sitter
-    4. Generate embeddings for code chunks
-    5. Build BM25 + Vector indices
+    1. Fetch user and repo_url from database
+    2. Clone/pull repository using GitSyncService
+    3. Find all code files (Python, JavaScript, etc.)
+    4. Parse with tree-sitter
+    5. Generate embeddings for code chunks
+    6. Build BM25 + Vector indices
 
     Args:
-        repository_id: Repository ID to reindex
+        user_id: User ID whose repository to reindex
 
     Returns:
         Indexing statistics
@@ -64,19 +66,22 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
     db: Session = SessionLocal()
 
     try:
-        # 1. Get repository info from database
-        # TODO: Add Repository model query
-        # For now, use placeholder repo path
-        repo_path = f"/repos/repo_{repository_id}"
+        # 1. Get user and repository info from database
+        user = db.query(User).filter(User.id == user_id).first()
 
-        if not os.path.exists(repo_path):
+        if not user or not user.repo_url:
             return {
                 "status": "error",
-                "message": f"Repository path not found: {repo_path}",
+                "message": f"User {user_id} not found or no repository configured",
                 "files_processed": 0
             }
 
-        # 2. Find code files
+        # 2. Clone/pull repository using GitSyncService
+        git_service = GitSyncService()
+        repo = git_service.clone_or_pull(user.repo_url, user.id)
+        repo_path = repo.working_dir
+
+        # 3. Find code files
         code_files = _find_code_files(repo_path)
 
         if not code_files:
@@ -86,7 +91,7 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
                 "files_processed": 0
             }
 
-        # 3. Parse and chunk code files
+        # 4. Parse and chunk code files
         all_chunks = []
         for file_path in code_files:
             try:
@@ -98,7 +103,8 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
                 # Add metadata to chunks
                 for chunk in chunks:
                     chunk['id'] = f"{file_path}:{chunk['start_line']}"
-                    chunk['repository_id'] = repository_id
+                    chunk['user_id'] = user_id
+                    chunk['file_path'] = file_path  # Add file path
                     chunk['content'] = chunk['code']  # Alias for search
 
                 all_chunks.extend(chunks)
@@ -108,7 +114,7 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
                 print(f"Error processing {file_path}: {e}")
                 continue
 
-        # 4. Generate embeddings (async batch processing)
+        # 5. Generate embeddings (async batch processing)
         embeddings_data = []
         for chunk in all_chunks:
             embedding_doc = {
@@ -121,7 +127,7 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
                     "name": chunk['name'],
                     "start_line": chunk['start_line'],
                     "end_line": chunk['end_line'],
-                    "repository_id": repository_id
+                    "user_id": user_id
                 }
             }
             embeddings_data.append(embedding_doc)
@@ -129,21 +135,21 @@ def reindex_repository(self, repository_id: int) -> Dict[str, Any]:
         # Store embeddings in Qdrant (batch operation)
         self.embedding_service.store_code_embeddings(embeddings_data)
 
-        # 5. Build BM25 index
+        # 6. Build BM25 index
         self.hybrid_search.build_bm25_index(all_chunks)
 
         return {
             "status": "success",
-            "repository_id": repository_id,
+            "user_id": user_id,
             "files_processed": len(code_files),
             "chunks_indexed": len(all_chunks),
-            "message": f"Successfully indexed {len(code_files)} files"
+            "message": f"Successfully indexed {len(code_files)} files for user {user_id}"
         }
 
     except Exception as e:
         return {
             "status": "error",
-            "repository_id": repository_id,
+            "user_id": user_id,
             "message": f"Indexing failed: {str(e)}",
             "files_processed": 0
         }
@@ -193,7 +199,7 @@ def reindex_all_repositories() -> Dict[str, Any]:
 
 
 @celery_app.task(base=RAGIndexingTask, bind=True, name="app.tasks.rag_indexing.analyze_code_file")
-def analyze_code_file(self, file_path: str, repository_id: int) -> Dict[str, Any]:
+def analyze_code_file(self, file_path: str, user_id: int) -> Dict[str, Any]:
     """
     Analyze a single code file with LLM
 
@@ -201,7 +207,7 @@ def analyze_code_file(self, file_path: str, repository_id: int) -> Dict[str, Any
 
     Args:
         file_path: Path to code file
-        repository_id: Repository ID
+        user_id: User ID
 
     Returns:
         Analysis results
@@ -226,7 +232,7 @@ def analyze_code_file(self, file_path: str, repository_id: int) -> Dict[str, Any
                     "name": chunk['name'],
                     "start_line": chunk['start_line'],
                     "end_line": chunk['end_line'],
-                    "repository_id": repository_id,
+                    "user_id": user_id,
                     "analysis": chunk.get('analysis', {})
                 }
             }

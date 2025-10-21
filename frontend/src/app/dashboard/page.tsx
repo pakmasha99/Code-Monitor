@@ -1,7 +1,7 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut, Plus } from "lucide-react";
+import { LogOut, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { getCurrentWeekRankings } from "@/lib/api";
 import { LeaderboardChart } from "@/components/charts/LeaderboardChart";
@@ -140,6 +140,12 @@ export default async function DashboardPage() {
                 Weekly Submit
               </Button>
             </Link>
+            <Link href="/code-search">
+              <Button variant="outline" size="sm">
+                <Search className="h-4 w-4 mr-2" />
+                Code Q&A
+              </Button>
+            </Link>
             <div className="text-sm text-right">
               <p className="font-medium">{session.user.name}</p>
               <p className="text-muted-foreground">{session.user.email}</p>
@@ -173,7 +179,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Stats Grid - Bento Style */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">📊</div>
               <h3 className="font-semibold text-lg mb-1">Your Rank</h3>
@@ -187,20 +193,13 @@ export default async function DashboardPage() {
               <div className="text-4xl mb-2">⚡</div>
               <h3 className="font-semibold text-lg mb-1">Total Score</h3>
               <p className="text-3xl font-bold text-primary">{userStats.score.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">Lines</p>
+              <p className="text-sm text-muted-foreground mt-1">Points</p>
             </div>
 
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">💻</div>
               <h3 className="font-semibold text-lg mb-1">Lines Added</h3>
               <p className="text-3xl font-bold text-primary">{userStats.linesAdded.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground mt-1">This week</p>
-            </div>
-
-            <div className="rounded-lg border bg-card p-6">
-              <div className="text-4xl mb-2">🔥</div>
-              <h3 className="font-semibold text-lg mb-1">Commits</h3>
-              <p className="text-3xl font-bold text-primary">{userStats.commits > 0 ? userStats.commits : 'N/A'}</p>
               <p className="text-sm text-muted-foreground mt-1">This week</p>
             </div>
           </div>

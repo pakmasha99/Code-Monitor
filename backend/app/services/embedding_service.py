@@ -259,6 +259,45 @@ Code: {chunk['code'][:500]}
             analysis = chunk.get('analysis', {})
             await self.store_code_embedding(analysis, chunk, user_info)
 
+    def store_code_embeddings(self, embeddings_data: List[Dict[str, Any]]):
+        """
+        Store multiple code embeddings in Qdrant (synchronous batch operation)
+
+        This is a simplified version for Celery tasks that don't use async/await.
+
+        Args:
+            embeddings_data: List of dicts with 'id', 'content', and 'metadata'
+        """
+        try:
+            points = []
+            for data in embeddings_data:
+                # Generate embedding synchronously (using openai.Embedding.create)
+                import openai
+                response = openai.embeddings.create(
+                    model=self.embedding_model,
+                    input=data['content'][:8000]  # Limit input size
+                )
+                embedding = response.data[0].embedding
+
+                # Create point
+                point = PointStruct(
+                    id=data['id'],
+                    vector=embedding,
+                    payload=data['metadata']
+                )
+                points.append(point)
+
+            # Batch upsert
+            self.client.upsert(
+                collection_name=self.collection_name,
+                points=points
+            )
+            print(f"✅ Stored {len(points)} embeddings in batch")
+
+        except Exception as e:
+            print(f"❌ Error storing code embeddings: {e}")
+            raise
+
     def get_collection_info(self) -> Dict[str, Any]:
         """
         Get information about the code embeddings collection

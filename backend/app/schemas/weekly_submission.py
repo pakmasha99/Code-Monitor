@@ -43,6 +43,11 @@ class WeeklySubmissionUpdate(BaseModel):
     code_lines_added: Optional[int] = Field(None, ge=0)
     documents_created: Optional[int] = Field(None, ge=0)
     notes: Optional[str] = Field(None, max_length=5000)
+    custom_repo_urls: Optional[List[str]] = Field(
+        None,
+        max_items=5,
+        description="Optional list of custom repository URLs (supports multiple repos per week)"
+    )
 
 
 class WeeklySubmissionResponse(BaseModel):

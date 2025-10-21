@@ -19,7 +19,9 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
   const [customRepoUrls, setCustomRepoUrls] = useState<string[]>(['']);
   const [repoUrlErrors, setRepoUrlErrors] = useState<{ [key: number]: string | null }>({});
 
-  // Auto-fetch git stats on component mount
+  const [existingSubmission, setExistingSubmission] = useState<any | null>(null);
+
+  // Auto-fetch git stats and check existing submission on component mount
   useEffect(() => {
     async function fetchGitStats() {
       try {
@@ -37,13 +39,48 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
           return;
         }
 
-        // Fetch git stats
-        const since = new Date(currentWeekMonday).toISOString();
-        const stats = await getGitStats(user.id, since);
+        // Check for existing submission for this week
+        const submissionsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions`);
+        const submissions = await submissionsResponse.json();
+        const existing = submissions.find((s: any) => s.week_start_date === currentWeekMonday);
 
-        // Set auto-fetched value
-        setAutoFetchedLines(stats.lines_added);
-        setCodeLinesAdded(stats.lines_added.toString());
+        if (existing) {
+          setExistingSubmission(existing);
+          setCodeLinesAdded(existing.code_lines_added.toString());
+
+          // Parse repository URLs from the stored string
+          if (existing.repository_url) {
+            const repoUrls = existing.repository_url.split(',').filter((url: string) => url.trim());
+            if (repoUrls.length > 0) {
+              setCustomRepoUrls(repoUrls);
+            }
+          }
+        }
+
+        // Fetch git stats (use custom repos if provided, otherwise user's default repo)
+        const since = new Date(currentWeekMonday).toISOString();
+        const nonEmptyCustomRepos = customRepoUrls.filter(url => url.trim());
+
+        // Prefer custom repos, fallback to user's repo_url
+        const repoUrlToFetch = nonEmptyCustomRepos.length > 0
+          ? nonEmptyCustomRepos[0]  // Use first custom repo for single repo API
+          : user.repo_url;
+
+        if (repoUrlToFetch) {
+          try {
+            const stats = await getGitStats(user.id, since, repoUrlToFetch);
+
+            // Only auto-fill if there's no existing submission
+            if (!existing) {
+              setAutoFetchedLines(stats.lines_added);
+              setCodeLinesAdded(stats.lines_added.toString());
+            }
+          } catch (statsError: any) {
+            console.error('Git stats fetch failed:', statsError);
+            // Don't fail the whole page load if git stats fail
+            setFetchError(`Git stats: ${statsError.message}`);
+          }
+        }
 
       } catch (error: any) {
         console.error('Failed to fetch git stats:', error);
@@ -130,7 +167,7 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
         throw new Error('User not found');
       }
 
-      // Submit the weekly submission
+      // Prepare submission data
       const submissionData: any = {
         week_start_date: weekStartDate,
         code_lines_added: parseInt(codeLinesAdded as string) || 0,
@@ -143,16 +180,33 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
         submissionData.custom_repo_urls = nonEmptyUrls;
       }
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(submissionData),
-        }
-      );
+      let response;
+
+      if (existingSubmission) {
+        // UPDATE existing submission (PATCH)
+        response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions/${existingSubmission.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submissionData),
+          }
+        );
+      } else {
+        // CREATE new submission (POST)
+        response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/users/${user.id}/submissions`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submissionData),
+          }
+        );
+      }
 
       if (response.ok) {
         // Redirect to dashboard on success
@@ -172,11 +226,26 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
     <main className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="rounded-lg border bg-card p-8">
         <h2 className="text-3xl font-bold mb-2">
-          Weekly Submission
+          {existingSubmission ? '✏️ Update Weekly Submission' : '📝 Weekly Submission'}
         </h2>
         <p className="text-muted-foreground mb-8">
-          Submit your weekly coding activities for week of <strong>{currentWeekMonday}</strong>
+          {existingSubmission
+            ? <>Update your weekly submission for week of <strong>{currentWeekMonday}</strong></>
+            : <>Submit your weekly coding activities for week of <strong>{currentWeekMonday}</strong></>
+          }
         </p>
+
+        {/* Existing submission notification */}
+        {existingSubmission && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
+            <p className="text-sm text-blue-700 dark:text-blue-400 font-semibold">
+              ℹ️ You already have a submission for this week
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+              Current values have been loaded. You can update them below.
+            </p>
+          </div>
+        )}
 
         {/* Auto-fetch status */}
         {loading && (
@@ -357,7 +426,10 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
               className="flex-1"
               disabled={loading || submitting}
             >
-              {submitting ? '⏳ Submitting...' : '✅ Submit Weekly Report'}
+              {submitting
+                ? (existingSubmission ? '⏳ Updating...' : '⏳ Submitting...')
+                : (existingSubmission ? '✅ Update Weekly Report' : '✅ Submit Weekly Report')
+              }
             </Button>
             <Link href="/dashboard" className="flex-1">
               <Button type="button" variant="outline" size="lg" className="w-full" disabled={submitting}>

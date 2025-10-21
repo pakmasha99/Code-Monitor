@@ -232,3 +232,127 @@ export async function getGitStats(
   }
   return response.json();
 }
+
+/**
+ * Get git statistics for multiple repositories (aggregated)
+ */
+export async function getGitStatsMultiRepo(
+  userId: number,
+  since: string,
+  repoUrls: string[]
+): Promise<GitStatsResponse> {
+  const params = new URLSearchParams({ since });
+  // Join multiple repo URLs with comma
+  params.append('repo_urls', repoUrls.join(','));
+
+  const response = await fetch(`${API_URL}/api/users/${userId}/git-stats?${params.toString()}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to fetch git stats');
+  }
+  return response.json();
+}
+
+// ============================================================================
+// RAG (Code Search & Q&A) API
+// ============================================================================
+
+export interface SearchResult {
+  id: string;
+  content: string;
+  score: number;
+  file_path?: string;
+  language?: string;
+  function_name?: string;
+  summary?: string;
+}
+
+export interface SearchResponse {
+  query: string;
+  search_type: string;
+  alpha?: number;
+  results: SearchResult[];
+  total: number;
+}
+
+export interface AskResponse {
+  question: string;
+  answer: string;
+  sources: SearchResult[];
+  confidence: number;
+}
+
+export interface ReindexResponse {
+  status: string;
+  task_id?: string;
+  message: string;
+}
+
+/**
+ * Search code using RAG (hybrid search)
+ */
+export async function searchCode(
+  query: string,
+  searchType: 'bm25' | 'vector' | 'hybrid' = 'hybrid',
+  limit: number = 10
+): Promise<SearchResponse> {
+  const response = await fetch(`${API_URL}/api/v1/rag/search`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      query,
+      limit,
+      search_type: searchType
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Code search failed');
+  }
+
+  return response.json();
+}
+
+/**
+ * Ask a question about the codebase
+ */
+export async function askCodeQuestion(
+  question: string,
+  maxContext: number = 5
+): Promise<AskResponse> {
+  const response = await fetch(`${API_URL}/api/v1/rag/ask`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      question,
+      max_context: maxContext,
+      include_sources: true
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Question answering failed');
+  }
+
+  return response.json();
+}
+
+/**
+ * Trigger codebase reindexing for a user
+ */
+export async function triggerReindex(userId: number): Promise<ReindexResponse> {
+  const response = await fetch(`${API_URL}/api/v1/rag/reindex`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ user_id: userId })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Reindex failed');
+  }
+
+  return response.json();
+}

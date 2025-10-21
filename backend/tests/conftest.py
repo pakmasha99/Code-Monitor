@@ -8,15 +8,18 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
 
 # Add backend directory to path
 backend_path = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_path))
 
-from app.main import app
-from app.models.base import Base
-from app.models.user import User, UserRole
-from app.core.database import get_db
+# Mock CodeAnalyzer to avoid tree-sitter import issues in test environment
+with patch('app.services.code_analyzer.CodeAnalyzer', MagicMock()):
+    from app.main import app
+    from app.models.base import Base
+    from app.models.user import User, UserRole
+    from app.core.database import get_db
 
 
 @pytest.fixture(scope="function")
