@@ -6,8 +6,17 @@ Provides code parsing, chunking, and LLM-based analysis capabilities.
 from anthropic import Anthropic
 import openai
 from tree_sitter import Language, Parser
-import tree_sitter_python as tspython
-import tree_sitter_javascript as tsjavascript
+import tree_sitter_python
+import tree_sitter_javascript
+import inspect
+import ctypes
+
+# Detect tree-sitter API version by checking Language constructor signature
+# Old API (0.21): Language(ptr, name) - 2 required params
+# New API (0.23+): Language(ptr) - 1 required param
+lang_sig = inspect.signature(Language.__init__)
+lang_params = [p for p in lang_sig.parameters.values() if p.default == inspect.Parameter.empty and p.name != 'self']
+TREESITTER_NEW_API = len(lang_params) == 1
 import os
 import json
 from typing import Dict, List, Optional, Any
@@ -33,13 +42,38 @@ class CodeAnalyzer:
         """Setup tree-sitter parsers for different languages"""
         self.parsers = {}
 
-        # Python parser
-        python_lang = Language(tspython.language())
-        self.parsers['python'] = Parser(python_lang)
+        if TREESITTER_NEW_API:
+            # Python 3.11+ API (tree-sitter 0.23+)
+            python_lang = Language(tree_sitter_python.language())
+            self.parsers['python'] = Parser(python_lang)
 
-        # JavaScript parser
-        js_lang = Language(tsjavascript.language())
-        self.parsers['javascript'] = Parser(js_lang)
+            js_lang = Language(tree_sitter_javascript.language())
+            self.parsers['javascript'] = Parser(js_lang)
+        else:
+            # Python 3.8 API (tree-sitter 0.21)
+            # Helper function to extract pointer (handles both PyCapsule and int)
+            def get_language_ptr(lang_obj):
+                if isinstance(lang_obj, int):
+                    return lang_obj  # Already a pointer
+                else:
+                    # Extract from PyCapsule
+                    pythonapi = ctypes.pythonapi
+                    pythonapi.PyCapsule_GetPointer.restype = ctypes.c_void_p
+                    pythonapi.PyCapsule_GetPointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+                    return pythonapi.PyCapsule_GetPointer(lang_obj, b"tree_sitter.Language")
+
+            # Python parser
+            python_ptr = get_language_ptr(tree_sitter_python.language())
+            python_lang = Language(python_ptr, "python")
+            self.parsers['python'] = Parser()
+            self.parsers['python'].set_language(python_lang)
+
+            # JavaScript parser
+            js_ptr = get_language_ptr(tree_sitter_javascript.language())
+            js_lang = Language(js_ptr, "javascript")
+            self.parsers['javascript'] = Parser()
+            self.parsers['javascript'].set_language(js_lang)
+
         self.parsers['typescript'] = self.parsers['javascript']  # Share JS parser for TS
 
     def detect_language(self, file_path: str) -> str:
