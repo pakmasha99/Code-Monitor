@@ -26,6 +26,40 @@ export default async function DashboardPage() {
     redirect('/');
   }
 
+  // Fetch user's own stats
+  let userStats = { rank: 0, score: 0, linesAdded: 0, commits: 0 };
+  try {
+    // Get all users to find current user's ID
+    const usersResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`);
+    const users = await usersResponse.json();
+    const currentUser = users.find((u: any) => u.email === session.user!.email);
+
+    if (currentUser) {
+      // Get rankings to find user's rank and score
+      const rankings = await getCurrentWeekRankings();
+      const userRanking = rankings.find(r => r.user_name === currentUser.name);
+
+      if (userRanking) {
+        userStats.rank = userRanking.rank_position;
+        userStats.score = userRanking.total_score;
+      }
+
+      // Get user's submissions to get lines added
+      const submissionsResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/users/${currentUser.id}/submissions`
+      );
+      const submissions = await submissionsResponse.json();
+
+      // Get current week's submission
+      if (submissions.length > 0) {
+        const latestSubmission = submissions[submissions.length - 1];
+        userStats.linesAdded = latestSubmission.code_lines_added;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch user stats:', error);
+  }
+
   // Fetch real leaderboard data from FastAPI
   let leaderboardData;
   try {
@@ -108,28 +142,30 @@ export default async function DashboardPage() {
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">📊</div>
               <h3 className="font-semibold text-lg mb-1">Your Rank</h3>
-              <p className="text-3xl font-bold text-primary">#2</p>
+              <p className="text-3xl font-bold text-primary">
+                {userStats.rank > 0 ? `#${userStats.rank}` : 'N/A'}
+              </p>
               <p className="text-sm text-muted-foreground mt-1">This week</p>
             </div>
 
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">⚡</div>
               <h3 className="font-semibold text-lg mb-1">Total Score</h3>
-              <p className="text-3xl font-bold text-primary">80</p>
+              <p className="text-3xl font-bold text-primary">{userStats.score}</p>
               <p className="text-sm text-muted-foreground mt-1">Points</p>
             </div>
 
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">💻</div>
               <h3 className="font-semibold text-lg mb-1">Lines Added</h3>
-              <p className="text-3xl font-bold text-primary">850</p>
+              <p className="text-3xl font-bold text-primary">{userStats.linesAdded.toLocaleString()}</p>
               <p className="text-sm text-muted-foreground mt-1">This week</p>
             </div>
 
             <div className="rounded-lg border bg-card p-6">
               <div className="text-4xl mb-2">🔥</div>
               <h3 className="font-semibold text-lg mb-1">Commits</h3>
-              <p className="text-3xl font-bold text-primary">15</p>
+              <p className="text-3xl font-bold text-primary">{userStats.commits > 0 ? userStats.commits : 'N/A'}</p>
               <p className="text-sm text-muted-foreground mt-1">This week</p>
             </div>
           </div>
