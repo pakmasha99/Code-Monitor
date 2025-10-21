@@ -3,7 +3,7 @@ User API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import get_db
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api", tags=["Users"])
 class UserCreate(BaseModel):
     name: str
     email: str
-    github_username: str | None = None
-    repo_url: str | None = None
+    github_username: Optional[str] = None
+    repo_url: Optional[str] = None
     role: UserRole = UserRole.STUDENT
 
 
@@ -27,8 +27,8 @@ class UserResponse(BaseModel):
     id: int
     name: str
     email: str
-    github_username: str | None
-    repo_url: str | None
+    github_username: Optional[str]
+    repo_url: Optional[str]
     role: UserRole
     is_active: bool
 
