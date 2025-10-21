@@ -11,7 +11,7 @@ celery_app = Celery(
     "code_monitor",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=['app.tasks.git_sync', 'app.tasks.ranking_update']
+    include=['app.tasks.git_sync', 'app.tasks.ranking_update', 'app.tasks.rag_indexing']
 )
 
 # Celery configuration
@@ -37,5 +37,9 @@ celery_app.conf.beat_schedule = {
     'update-rankings-weekly': {
         'task': 'app.tasks.ranking_update.update_current_week_rankings',
         'schedule': 604800.0,  # Every 7 days (weekly)
+    },
+    'reindex-code-daily': {
+        'task': 'app.tasks.rag_indexing.reindex_all_repositories',
+        'schedule': 86400.0,  # Every 24 hours (after git sync)
     },
 }

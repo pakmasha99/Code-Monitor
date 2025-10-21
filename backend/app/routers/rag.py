@@ -280,7 +280,7 @@ async def get_index_status():
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
 
-@router.post("/reindex", response_model=ReindexResponse)
+@router.post("/reindex", response_model=ReindexResponse, status_code=202)
 async def trigger_reindex(request: ReindexRequest, background_tasks: BackgroundTasks):
     """
     Trigger codebase reindexing
@@ -291,15 +291,19 @@ async def trigger_reindex(request: ReindexRequest, background_tasks: BackgroundT
     3. Generate embeddings
     4. Build BM25 + vector indices
 
-    **Note**: This is an async background task
+    **Note**: This is an async background task (Celery)
     """
     try:
-        # TODO: Implement background reindexing with Celery
-        # For now, return 501 Not Implemented
+        # Import here to avoid circular dependency
+        from app.tasks.rag_indexing import reindex_repository
+
+        # Trigger async Celery task
+        task = reindex_repository.delay(request.repository_id)
+
         return ReindexResponse(
-            status="not_implemented",
-            task_id=None,
-            message="Background reindexing not yet implemented. Will be added in Phase 3."
+            status="queued",
+            task_id=task.id,
+            message=f"Repository {request.repository_id} reindexing queued. Task ID: {task.id}"
         )
 
     except Exception as e:
