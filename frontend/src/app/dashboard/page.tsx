@@ -19,7 +19,15 @@ export default async function DashboardPage() {
   }
 
   // Fetch user's own stats and activity data
-  let userStats = { rank: 0, score: 0, linesAdded: 0, commits: 0, productivity: 0 };
+  let userStats = {
+    rank: 0,
+    score: 0,
+    linesAdded: 0,
+    codeLines: 0,
+    documentLines: 0,
+    commits: 0,
+    productivity: 0
+  };
   let activityData: Array<{ week: string; commits: number; lines: number; score: number }> = [];
 
   try {
@@ -48,7 +56,9 @@ export default async function DashboardPage() {
       // Build activity data from real submissions
       if (submissions.length > 0) {
         const latestSubmission = submissions[0]; // Most recent first from API
-        userStats.linesAdded = latestSubmission.code_lines_added;
+        userStats.codeLines = latestSubmission.code_lines_added || 0;
+        userStats.documentLines = latestSubmission.document_lines_added || 0;
+        userStats.linesAdded = userStats.codeLines + userStats.documentLines;
 
         // Convert submissions to activity chart format (last 4 weeks)
         activityData = submissions.slice(0, 4).reverse().map((sub: any, index: number) => {
@@ -214,11 +224,10 @@ export default async function DashboardPage() {
 
             {/* Score Breakdown */}
             <div className="rounded-lg border bg-card p-6">
-              <h2 className="text-2xl font-bold mb-4">🎯 Your Score Breakdown</h2>
+              <h2 className="text-2xl font-bold mb-4">🎯 Your Lines Breakdown</h2>
               <ScoreBreakdownChart
-                productivity={userStats.productivity > 0 ? 100 : 0}
-                quality={0}
-                consistency={0}
+                codeLines={userStats.codeLines}
+                documentLines={userStats.documentLines}
               />
             </div>
           </div>

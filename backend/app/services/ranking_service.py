@@ -15,9 +15,6 @@ from app.models.ranking import Ranking
 class RankingService:
     """Service for calculating and managing user rankings"""
 
-    # Simplified scoring: based on lines only
-    LINES_PER_DOCUMENT = 100
-
     def calculate_weekly_score(
         self,
         user_id: int,
@@ -25,9 +22,9 @@ class RankingService:
         db: Session
     ) -> Dict[str, float]:
         """
-        Calculate weekly score based on lines of work.
+        Calculate weekly score based on total lines added.
 
-        Score = code_lines_added + (documents_created × 100)
+        Score = code_lines_added + document_lines_added
 
         Args:
             user_id: User ID
@@ -35,7 +32,7 @@ class RankingService:
             db: Database session
 
         Returns:
-            Dict with total_score (in lines) and category scores
+            Dict with total_score and breakdown (code_lines, document_lines)
         """
         # Get weekly submission
         submission = db.query(WeeklySubmission).filter(
@@ -44,15 +41,19 @@ class RankingService:
         ).first()
 
         # Calculate total lines
-        total_lines = 0.0
+        code_lines = 0.0
+        document_lines = 0.0
+
         if submission:
-            total_lines = float(
-                submission.code_lines_added +
-                (submission.documents_created * self.LINES_PER_DOCUMENT)
-            )
+            code_lines = float(submission.code_lines_added)
+            document_lines = float(submission.document_lines_added)
+
+        total_lines = code_lines + document_lines
 
         return {
             'total_score': total_lines,
+            'code_lines': code_lines,
+            'document_lines': document_lines,
             'productivity': total_lines,  # All score is productivity
             'quality': 0.0,
             'consistency': 0.0

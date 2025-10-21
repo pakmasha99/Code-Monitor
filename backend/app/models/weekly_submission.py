@@ -19,7 +19,8 @@ class WeeklySubmission(Base):
         week_start_date: Monday of the week (ISO week start)
         code_lines_added: Self-reported lines of code added
         code_lines_modified: Self-reported lines of code modified
-        documents_created: Number of documents created this week
+        document_lines_added: Actual line count from documents (PDFs, text files, etc.)
+        documents_created: Number of documents created this week (deprecated, use document_lines_added)
         documents_modified: Number of documents modified this week
         notes: Free-text weekly notes/summary
         repository_url: The actual repository URL used for this submission
@@ -35,6 +36,7 @@ class WeeklySubmission(Base):
     week_start_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     code_lines_added: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     code_lines_modified: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    document_lines_added: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     documents_created: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     documents_modified: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

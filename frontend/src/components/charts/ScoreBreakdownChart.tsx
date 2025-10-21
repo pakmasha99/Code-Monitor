@@ -3,18 +3,27 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface ScoreBreakdownChartProps {
-  productivity: number;
-  quality: number;
-  consistency: number;
+  codeLines: number;
+  documentLines: number;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
+const COLORS = ['#3b82f6', '#10b981']; // Blue for code, Green for documents
 
-export function ScoreBreakdownChart({ productivity, quality, consistency }: ScoreBreakdownChartProps) {
+export function ScoreBreakdownChart({ codeLines, documentLines }: ScoreBreakdownChartProps) {
+  const total = codeLines + documentLines;
+
+  // If no data, show placeholder
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center h-[250px] text-muted-foreground">
+        <p>No data to display. Submit your weekly work to see breakdown.</p>
+      </div>
+    );
+  }
+
   const data = [
-    { name: 'Productivity', value: productivity },
-    { name: 'Quality', value: quality },
-    { name: 'Consistency', value: consistency },
+    { name: 'Code', value: codeLines },
+    { name: 'Documents', value: documentLines },
   ].filter(item => item.value > 0); // Only show non-zero values
 
   return (
@@ -34,7 +43,7 @@ export function ScoreBreakdownChart({ productivity, quality, consistency }: Scor
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip />
+        <Tooltip formatter={(value: number) => `${value} lines`} />
         <Legend />
       </PieChart>
     </ResponsiveContainer>

@@ -110,6 +110,13 @@ async def search_code(request: SearchRequest):
     **Dynamic Alpha**: If alpha not provided, automatically calculated based on query length
     """
     try:
+        # Check if BM25 index is needed and built
+        if request.search_type in ["bm25", "hybrid"] and hybrid_search.bm25_index is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Code index not initialized. Please run POST /api/v1/rag/reindex first to index your codebase."
+            )
+
         results = []
 
         if request.search_type == "bm25":
@@ -173,6 +180,13 @@ async def ask_code_question(request: AskRequest):
     4. Return answer with source citations
     """
     try:
+        # Check if index is built
+        if hybrid_search.bm25_index is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Code index not initialized. Please run POST /api/v1/rag/reindex first to index your codebase."
+            )
+
         # 1. Retrieve relevant code
         search_results = await hybrid_search.hybrid_search(
             request.question,
