@@ -4,7 +4,7 @@ Git repository synchronization and analysis service
 import os
 import shutil
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import git
 from git import Repo, NULL_TREE
@@ -70,8 +70,13 @@ class GitSyncService:
             List of commits
         """
         commits = []
+        # Ensure since_date is timezone-aware (UTC)
+        if since_date.tzinfo is None:
+            since_date = since_date.replace(tzinfo=timezone.utc)
+
         for commit in repo.iter_commits():
-            commit_date = datetime.fromtimestamp(commit.committed_date)
+            # Convert commit timestamp to timezone-aware datetime (UTC)
+            commit_date = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
             if commit_date < since_date:
                 break
             commits.append(commit)
@@ -100,40 +105,42 @@ class GitSyncService:
         languages = {}
 
         for commit in commits:
-            # Get parent commit (or empty tree for first commit)
-            parent = commit.parents[0] if commit.parents else NULL_TREE
+            # Use git show --numstat for accurate line counts
+            try:
+                stats_output = repo.git.show(commit.hexsha, '--numstat', '--format=')
 
-            # Analyze diffs
-            diffs = commit.diff(parent)
+                for line in stats_output.split('\n'):
+                    line = line.strip()
+                    if not line:
+                        continue
 
-            for diff in diffs:
-                # Track changed files
-                file_path = diff.a_path or diff.b_path
-                if file_path:
-                    files_changed.add(file_path)
+                    parts = line.split('\t')
+                    if len(parts) >= 3:
+                        added_str, deleted_str, file_path = parts[0], parts[1], parts[2]
 
-                    # Detect language from extension
-                    ext = Path(file_path).suffix
-                    lang = self._detect_language(ext)
+                        # Track changed files
+                        files_changed.add(file_path)
 
-                    # Calculate line changes
-                    if diff.diff:
-                        try:
-                            diff_text = diff.diff.decode('utf-8', errors='ignore')
-                            lines = diff_text.split('\n')
+                        # Parse line changes (skip binary files marked with '-')
+                        if added_str != '-' and deleted_str != '-':
+                            try:
+                                added = int(added_str)
+                                deleted = int(deleted_str)
 
-                            added = sum(1 for line in lines if line.startswith('+') and not line.startswith('+++'))
-                            deleted = sum(1 for line in lines if line.startswith('-') and not line.startswith('---'))
+                                lines_added += added
+                                lines_deleted += deleted
 
-                            lines_added += added
-                            lines_deleted += deleted
+                                # Detect language and track
+                                ext = Path(file_path).suffix
+                                lang = self._detect_language(ext)
+                                if lang:
+                                    languages[lang] = languages.get(lang, 0) + added
 
-                            # Track by language
-                            if lang:
-                                languages[lang] = languages.get(lang, 0) + added
+                            except ValueError:
+                                pass  # Skip if not a number
 
-                        except Exception as e:
-                            print(f"Warning: Could not analyze diff for {file_path}: {e}")
+            except Exception as e:
+                print(f"Warning: Could not analyze commit {commit.hexsha}: {e}")
 
         return {
             'commits_count': len(commits),
