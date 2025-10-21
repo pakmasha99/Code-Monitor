@@ -15,6 +15,7 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [autoFetchedLines, setAutoFetchedLines] = useState<number | null>(null);
   const [codeLinesAdded, setCodeLinesAdded] = useState<string>('0');
+  const [documentLinesAdded, setDocumentLinesAdded] = useState<string>('0');
   const [submitting, setSubmitting] = useState(false);
   const [customRepoUrls, setCustomRepoUrls] = useState<string[]>(['']);
   const [repoUrlErrors, setRepoUrlErrors] = useState<{ [key: number]: string | null }>({});
@@ -47,6 +48,7 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
         if (existing) {
           setExistingSubmission(existing);
           setCodeLinesAdded(existing.code_lines_added.toString());
+          setDocumentLinesAdded((existing.document_lines_added || 0).toString());
 
           // Parse repository URLs from the stored string
           if (existing.repository_url) {
@@ -143,7 +145,7 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
 
     const formData = new FormData(e.currentTarget);
     const codeLinesAdded = formData.get('code_lines_added');
-    const documentsCreated = formData.get('documents_created');
+    const documentLinesAdded = formData.get('document_lines_added');
     const notes = formData.get('notes');
     const weekStartDate = formData.get('week_start_date');
 
@@ -171,7 +173,8 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
       const submissionData: any = {
         week_start_date: weekStartDate,
         code_lines_added: parseInt(codeLinesAdded as string) || 0,
-        documents_created: parseInt(documentsCreated as string) || 0,
+        document_lines_added: parseInt(documentLinesAdded as string) || 0,
+        documents_created: 0, // Deprecated field
         notes: notes || null,
       };
 
@@ -378,24 +381,28 @@ export default function SubmitClient({ userEmail, currentWeekMonday }: SubmitCli
             )}
           </div>
 
-          {/* Documents Created */}
+          {/* Document Lines Added */}
           <div className="space-y-2">
-            <label htmlFor="documents_created" className="text-sm font-medium">
-              📄 Documents Created
+            <label htmlFor="document_lines_added" className="text-sm font-medium">
+              📄 Document Lines Added
             </label>
             <input
               type="number"
-              id="documents_created"
-              name="documents_created"
+              id="document_lines_added"
+              name="document_lines_added"
               min="0"
-              defaultValue="0"
+              value={documentLinesAdded}
+              onChange={(e) => setDocumentLinesAdded(e.target.value)}
               required
               disabled={loading}
               className="w-full px-4 py-2 rounded-md border bg-background disabled:opacity-50"
-              placeholder="e.g., 3"
+              placeholder="e.g., 320"
             />
             <p className="text-xs text-muted-foreground">
-              Number of documentation files/pages created
+              Total lines from documents (PDFs, markdown, text files, etc.)
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              💡 Tip: Use our DocumentAnalyzer to count lines in PDFs automatically
             </p>
           </div>
 
