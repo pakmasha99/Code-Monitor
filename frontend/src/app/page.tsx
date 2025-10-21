@@ -3,6 +3,9 @@ import { Github } from "lucide-react";
 import { signIn, auth } from "@/auth";
 import { redirect } from "next/navigation";
 
+// Force dynamic rendering to prevent caching of session state
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const session = await auth();
 

@@ -1,11 +1,15 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
+import Link from "next/link";
 import { getCurrentWeekRankings } from "@/lib/api";
 import { LeaderboardChart } from "@/components/charts/LeaderboardChart";
 import { ActivityChart } from "@/components/charts/ActivityChart";
 import { ScoreBreakdownChart } from "@/components/charts/ScoreBreakdownChart";
+
+// Force dynamic rendering to prevent caching of session state
+export const dynamic = 'force-dynamic';
 
 // Mock data for charts (will be replaced with real API data)
 const mockActivityData = [
@@ -26,11 +30,21 @@ export default async function DashboardPage() {
   let leaderboardData;
   try {
     const rankings = await getCurrentWeekRankings();
-    leaderboardData = rankings.slice(0, 10).map(ranking => ({
-      name: ranking.user_name,  // Backend returns user_name directly
-      score: ranking.total_score,
-      rank: ranking.rank_position,  // Backend returns rank_position
-    }));
+
+    // If API returns empty array, use mock data for demonstration
+    if (rankings.length === 0) {
+      leaderboardData = [
+        { name: '이영희', score: 130, rank: 1 },
+        { name: '김철수', score: 80, rank: 2 },
+        { name: '박민수', score: 65, rank: 3 },
+      ];
+    } else {
+      leaderboardData = rankings.slice(0, 10).map(ranking => ({
+        name: ranking.user_name,  // Backend returns user_name directly
+        score: ranking.total_score,
+        rank: ranking.rank_position,  // Backend returns rank_position
+      }));
+    }
   } catch (error) {
     // Fallback to mock data if API is not available
     console.error('Failed to fetch leaderboard:', error);
@@ -51,6 +65,12 @@ export default async function DashboardPage() {
             <span className="text-sm text-muted-foreground">Dashboard</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/submit">
+              <Button variant="default" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Weekly Submit
+              </Button>
+            </Link>
             <div className="text-sm text-right">
               <p className="font-medium">{session.user.name}</p>
               <p className="text-muted-foreground">{session.user.email}</p>

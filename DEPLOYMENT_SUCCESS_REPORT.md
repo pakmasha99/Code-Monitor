@@ -72,6 +72,20 @@ github_username: Optional[str] = None
 label={({ name, percent }: any) => `${name}: ${((percent as number) * 100).toFixed(0)}%`}
 ```
 
+### 6️⃣ NextAuth UntrustedHost 에러
+**문제**: IP 주소 접속 시 NextAuth가 UntrustedHost 에러 발생
+```
+UntrustedHost: Host must be trusted. URL was: http://147.47.200.154:3000
+```
+
+**해결책**: `frontend/src/auth.ts` 수정
+```typescript
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true, // Allow IP address access for deployment
+  providers: [...]
+})
+```
+
 ### 5️⃣ Alembic 설정 누락
 **문제**: `alembic.ini` 파일 없음, 마이그레이션 불가
 
