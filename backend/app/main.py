@@ -12,13 +12,14 @@ from app.api.users import router as users_router
 from app.api.weekly_submissions import router as submissions_router
 from app.api.rankings import router as rankings_router
 from app.api.git_stats import router as git_stats_router
+from app.routers.rag import router as rag_router
 
 settings = get_settings()
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Lab Code Monitoring System",
-    version="0.1.0"
+    description="Lab Code Monitoring System - Now with RAG!",
+    version="0.2.0"
 )
 
 app.add_middleware(
@@ -34,6 +35,7 @@ app.include_router(users_router)
 app.include_router(submissions_router)
 app.include_router(rankings_router)
 app.include_router(git_stats_router)
+app.include_router(rag_router)  # RAG endpoints
 
 
 @app.get("/")
