@@ -23,6 +23,14 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.STUDENT
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    github_username: Optional[str] = None
+    repo_url: Optional[str] = None
+    role: Optional[UserRole] = None
+
+
 class UserResponse(BaseModel):
     id: int
     name: str
@@ -62,6 +70,23 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
     user = User(**user_data.model_dump())
     db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+    """Update user information"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Update only provided fields
+    update_data = user_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
     db.commit()
     db.refresh(user)
     return user
