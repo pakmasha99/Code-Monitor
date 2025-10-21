@@ -25,7 +25,8 @@ class CodeAnalyzer:
         """Initialize LLM clients and code parsers"""
         self.anthropic = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         openai.api_key = os.getenv("OPENAI_API_KEY")
-        self.llm_model = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20240620")
+        # Use latest Claude 4.5 Sonnet (Sept 2025) - best for coding & agents
+        self.llm_model = os.getenv("LLM_MODEL", "claude-sonnet-4-5-20250929")
         self.setup_parsers()
 
     def setup_parsers(self):
