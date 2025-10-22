@@ -56,6 +56,8 @@ export interface LeaderboardEntry extends Ranking {
 export interface GitStatsResponse {
   commits_count: number;
   files_changed: number;
+  code_lines_added: number;
+  document_lines_added: number;
   lines_added: number;
   lines_deleted: number;
   languages_breakdown: Record<string, number>;

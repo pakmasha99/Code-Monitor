@@ -96,12 +96,15 @@ class GitSyncService:
             Dict with metrics:
             - commits_count: Number of commits
             - files_changed: Set of changed files
-            - lines_added: Total lines added
+            - code_lines_added: Lines added in code files
+            - document_lines_added: Lines added in documentation files
+            - lines_added: Total lines added (code + docs)
             - lines_deleted: Total lines deleted
             - languages_breakdown: Dict of language to line count
         """
         files_changed = set()
-        lines_added = 0
+        code_lines_added = 0
+        document_lines_added = 0
         lines_deleted = 0
         languages = {}
 
@@ -128,11 +131,17 @@ class GitSyncService:
                                 added = int(added_str)
                                 deleted = int(deleted_str)
 
-                                lines_added += added
+                                ext = Path(file_path).suffix
+
+                                # Separate code vs document lines
+                                if self._is_document_file(ext):
+                                    document_lines_added += added
+                                else:
+                                    code_lines_added += added
+
                                 lines_deleted += deleted
 
                                 # Detect language and track
-                                ext = Path(file_path).suffix
                                 lang = self._detect_language(ext)
                                 if lang:
                                     languages[lang] = languages.get(lang, 0) + added
@@ -146,10 +155,28 @@ class GitSyncService:
         return {
             'commits_count': len(commits),
             'files_changed': len(files_changed),
-            'lines_added': lines_added,
+            'code_lines_added': code_lines_added,
+            'document_lines_added': document_lines_added,
+            'lines_added': code_lines_added + document_lines_added,
             'lines_deleted': lines_deleted,
             'languages_breakdown': languages
         }
+
+    def _is_document_file(self, extension: str) -> bool:
+        """Check if file extension is a documentation file"""
+        doc_extensions = {
+            '.md', '.markdown',  # Markdown
+            '.txt',              # Plain text
+            '.rst',              # reStructuredText
+            '.adoc', '.asciidoc',  # AsciiDoc
+            '.tex', '.latex',    # LaTeX
+            '.org',              # Org mode
+            '.rtf',              # Rich Text Format
+            '.pdf',              # PDF (if tracked in git)
+            '.doc', '.docx',     # Word documents (if tracked)
+            '.odt',              # OpenDocument Text
+        }
+        return extension.lower() in doc_extensions
 
     def _detect_language(self, extension: str) -> Optional[str]:
         """Detect programming language from file extension"""

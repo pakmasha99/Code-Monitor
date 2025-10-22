@@ -74,3 +74,66 @@ celery -A app.core.celery_app worker --loglevel=info
 **Dependencies:**
 - `requests` - For API calls
 - SQLAlchemy models - For database queries
+
+---
+
+## Ranking Recalculation
+
+### `recalculate_rankings.py`
+
+Recalculate all rankings in the database using the current scoring formula.
+
+**When to use:**
+- After changing the scoring formula
+- When dashboard shows score mismatch (Score vs Lines Added)
+- After database migrations affecting scoring logic
+- To fix historical ranking data
+
+**What it does:**
+- Recalculates total_score for all rankings using current formula
+- Formula: `Total Score = code_lines_added + document_lines_added`
+- Updates rank_position based on new scores
+- Preserves category_scores breakdown
+
+**Prerequisites:**
+1. PostgreSQL database running
+2. Backend virtual environment activated
+
+**Usage:**
+
+```bash
+# Recalculate all weeks
+python scripts/recalculate_rankings.py
+
+# Recalculate specific week only (week_start_date must be Monday)
+python scripts/recalculate_rankings.py --week-start-date 2024-10-14
+```
+
+**Example output:**
+```
+🎯 Recalculating rankings for 1 weeks
+
+📅 Processing week: 2025-10-20
+   ✅ Success: 1 rankings updated
+
+============================================================
+✨ Recalculation Summary:
+   Total weeks: 1
+   Successful: 1
+   Failed: 0
+============================================================
+
+🎉 All rankings recalculated successfully!
+   Rankings now use formula: Total Score = code_lines_added + document_lines_added
+```
+
+**Troubleshooting:**
+
+- **ModuleNotFoundError**: Activate virtual environment first (`source venv/bin/activate`)
+- **Database connection failed**: Check PostgreSQL is running and credentials are correct
+- **No submissions found**: Ensure weekly_submissions table has data
+- **Updated: 0 rankings**: No users had submissions for that week
+
+**Dependencies:**
+- SQLAlchemy models - For database queries
+- RankingService - For scoring logic

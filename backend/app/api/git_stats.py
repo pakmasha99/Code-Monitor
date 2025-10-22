@@ -83,6 +83,8 @@ def get_git_stats(
     # Aggregate statistics from all repositories
     total_commits = 0
     total_files_changed = set()
+    total_code_lines_added = 0
+    total_document_lines_added = 0
     total_lines_added = 0
     total_lines_deleted = 0
     total_languages = {}
@@ -103,6 +105,8 @@ def get_git_stats(
 
             # Aggregate statistics
             total_commits += stats['commits_count']
+            total_code_lines_added += stats['code_lines_added']
+            total_document_lines_added += stats['document_lines_added']
             total_lines_added += stats['lines_added']
             total_lines_deleted += stats['lines_deleted']
 
@@ -120,6 +124,8 @@ def get_git_stats(
         return GitStatsResponse(
             commits_count=total_commits,
             files_changed=0,  # Not meaningful when aggregating multiple repos
+            code_lines_added=total_code_lines_added,
+            document_lines_added=total_document_lines_added,
             lines_added=total_lines_added,
             lines_deleted=total_lines_deleted,
             languages_breakdown=total_languages,
