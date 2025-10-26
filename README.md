@@ -226,9 +226,8 @@ Internal use only - Research Lab Project
 
 ## 📞 Contact
 
-- **Project Lead:** [Your Name]
-- **Technical Support:** [Developer Name]
-- **Slack:** #code-monitor
+- **Project Lead:** [Jiook Cha]
+- **Technical Support:** [cha.jiook@gmail.com]
 
 ---
 
